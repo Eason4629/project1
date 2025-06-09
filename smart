@@ -1,0 +1,83 @@
+#define BLYNK_TEMPLATE_ID "TMPL6x_sL-A_3"
+#define BLYNK_TEMPLATE_NAME "Smart Socket"
+#define BLYNK_AUTH_TOKEN "IuCWqgWVkgXYBCWd06Q_J_0-46756XO_"
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <PZEM004Tv30.h>
+
+char ssid[] = "Steve1F";          // 你的 Wi-Fi 名稱
+char pass[] = "0939085662";                // 你的 Wi-Fi 密碼
+
+HardwareSerial pzemSerial(2);               // 使用 Serial2
+PZEM004Tv30 pzem(pzemSerial, 16, 17);       // RX=16, TX=17
+
+BlynkTimer timer;
+
+void sendData() {
+  float voltage = pzem.voltage();
+  float current = pzem.current();
+  float power   = pzem.power();
+  float energy  = pzem.energy();
+
+  Serial.println("=== PZEM-004T Data ===");
+  Serial.print("Voltage: "); Serial.println(voltage);
+  Serial.print("Current: "); Serial.println(current);
+  Serial.print("Power: ");   Serial.println(power);
+  Serial.print("Energy: ");  Serial.println(energy);
+
+  Blynk.virtualWrite(V0, voltage);
+  Blynk.virtualWrite(V1, current);
+  Blynk.virtualWrite(V2, power);
+  Blynk.virtualWrite(V3, energy);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pzemSerial.begin(9600, SERIAL_8N1, 16, 17);  // PZEM 通訊
+
+  // WiFi 連線
+  WiFi.begin(ssid, pass);
+  Serial.println("Connecting to WiFi...");
+
+  int retry = 0;
+  while (WiFi.status() != WL_CONNECTED && retry < 20) {
+    delay(500);
+    Serial.print(".");
+    retry++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi connected!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ WiFi connection failed!");
+  }
+
+  // Blynk 設定與連線（加 timeout）
+  Blynk.config(BLYNK_AUTH_TOKEN, "blynk.cloud", 80);
+  if (Blynk.connect(10000)) {
+    Serial.println("✅ Blynk connected!");
+  } else {
+    Serial.println("❌ Blynk not connected!");
+  }
+
+  // 每秒傳送一次資料
+  timer.setInterval(1000L, sendData);
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+
+  // 每 5 秒顯示 WiFi/Blynk 狀態
+  static unsigned long lastCheck = 0;
+  if (millis() - lastCheck > 5000) {
+    lastCheck = millis();
+    Serial.print("WiFi: ");
+    Serial.print(WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
+    Serial.print(" | Blynk: ");
+    Serial.println(Blynk.connected() ? "Connected" : "Not connected");
+  }
+}
